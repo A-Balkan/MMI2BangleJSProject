@@ -1,0 +1,85 @@
+<html>
+ <head>
+   <title>Bangle.js ButtonsTest</title>
+ </head>
+ <body style="margin:0px">
+<script src="https://www.puck-js.com/puck.js"></script>
+<button id="btnConnect" style="position:absolute;left:5px;top:5px;z-index:1000">Connect</button>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r99/three.min.js"></script>
+<script>
+// Code to upload to Bangle.js
+var BANGLE_CODE = `
+function button1() {
+  Bangle.buzz();
+  E.showMessage("BTN1", "PRESSED");
+  Bluetooth.println("B:BTN1");
+}
+
+function button2() {
+  Bangle.buzz();
+  E.showMessage("BTN2", "PRESSED");
+  Bluetooth.println("B:BTN2");
+}
+
+function button3() {
+  Bangle.buzz();
+  E.showMessage("BTN3", "PRESSED");
+  Bluetooth.println("B:BTN3");
+}
+
+setWatch(button1, BTN1, repeating=true);
+setWatch(button2, BTN2, repeating=true);
+setWatch(button3, BTN3, repeating=true);
+`;
+
+// When we click the connect button...
+var connection;
+document.getElementById("btnConnect").addEventListener("click", function() {
+  // disconnect if connected already
+  if (connection) {
+    connection.close();
+    connection = undefined;
+  }
+  // Connect
+  Puck.connect(function(c) {
+    if (!c) {
+      alert("Couldn't connect!");
+      return;
+    }
+    connection = c;
+    // Handle the data we get back, and call 'onLine'
+    // whenever we get a line
+    var buf = "";
+    connection.on("data", function(d) {
+      buf += d;
+      var l = buf.split("\n");
+      buf = l.pop();
+      l.forEach(onLine);
+    });
+    // First, reset the Bangle
+    connection.write("reset();\n", function() {
+      // Wait for it to reset itself
+      setTimeout(function() {
+        // Now upload our code to it
+        connection.write("\x03\x10if(1){"+BANGLE_CODE+"}\n",
+          function() { console.log("Ready..."); });
+      }, 1500);
+    });
+  });
+});
+
+// When we get a line of data, check it and if it's from the buttons
+var buttonStr = "";
+function onLine(line) {
+  //console.log("RECEIVED:"+line);
+  var d = line.split(":");
+  if (d.length==2 && d[0]=="B") {
+    // we have a button press
+    buttonStr = d[1];
+    console.log("Pressed Button: " + buttonStr);
+  }
+}
+
+</script>
+ </body>
+</html>
